@@ -2,6 +2,7 @@
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_video.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,47 @@ typedef unsigned int Cell;
 typedef struct {
   unsigned char r, g, b, a;
 } Rgba;
+
+typedef struct {
+  size_t state_count;
+  Cell *case_defs;
+} StateTransitions;
+
+StateTransitions state_transitions_new(size_t state_count, Cell base) {
+  StateTransitions rv = {
+      .state_count = state_count,
+      .case_defs = (Cell *)malloc(sizeof(Cell) * SDL_pow(8, state_count)),
+  };
+  memset(rv.case_defs, base, sizeof(Cell) * SDL_pow(8, state_count));
+
+  return rv;
+}
+
+void state_transitions_free_defs(StateTransitions *self) {
+  for (size_t i = 0; i < SDL_pow(8, self->state_count); i++)
+    free(self->case_defs + i);
+}
+
+size_t state_transitions_index(StateTransitions *self, size_t *neighbors) {
+  size_t idx = 0;
+  size_t item_size = SDL_pow(8, self->state_count - 1);
+  for (Cell state = 0; state < self->state_count; state++) {
+    idx += neighbors[state] * item_size;
+    item_size /= 8;
+  }
+
+  return idx;
+}
+
+void state_transitions_add_def(StateTransitions *self, size_t *neighbors,
+                               Cell result) {
+  size_t idx = state_transitions_index(self, neighbors);
+  self->case_defs[idx] = result;
+}
+
+Cell state_transitions_get(StateTransitions *self, size_t *neighbors) {
+  return self->case_defs[state_transitions_index(self, neighbors)];
+}
 
 void cell_draw(Cell cell, size_t i, Rgba *colors, SDL_Renderer *renderer) {
   Rgba clr = colors[cell];
@@ -49,6 +91,23 @@ int main(void) {
   // data
   Cell cells[CELL_COUNT];
   memset(cells, 0, sizeof(cells));
+
+  StateTransitions gol_dead = state_transitions_new(2, 0);
+  size_t neighbors[] = {5, 3};
+  state_transitions_add_def(&gol_dead, neighbors, 1);
+
+  StateTransitions gol_alive = state_transitions_new(2, 0);
+  neighbors[0] = 6;
+  neighbors[1] = 2;
+  state_transitions_add_def(&gol_alive, neighbors, 1);
+  neighbors[0] = 5;
+  neighbors[1] = 3;
+  state_transitions_add_def(&gol_alive, neighbors, 1);
+
+  neighbors[0] = 6;
+  neighbors[1] = 2;
+
+  printf("%d\n", state_transitions_get(&gol_dead, neighbors));
 
   Rgba colors[2];
   colors[0].r = 0;
@@ -86,6 +145,8 @@ int main(void) {
   }
 
 quit:
+  state_transitions_free_defs(&gol_dead);
+  state_transitions_free_defs(&gol_alive);
   SDL_DestroyWindow(window);
   SDL_DestroyRenderer(renderer);
   SDL_Quit();
