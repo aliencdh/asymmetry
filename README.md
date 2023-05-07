@@ -1,2 +1,2 @@
 # asymmetry
-Asymmetry is a cellular automata interpreter written in C.
+Asymmetry is a cellular automata interpreter written in C++.
